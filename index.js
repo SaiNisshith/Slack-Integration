@@ -62,6 +62,8 @@ app.post('/slack/events', async (req, res) => {
   }
 });
 
+app.use('/slack/interactions', bodyParser.urlencoded({ extended: true }));
+
 app.post('/slack/interactions', async (req, res) => {
   const payload = JSON.parse(req.body.payload);
 
