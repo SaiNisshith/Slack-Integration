@@ -20,14 +20,14 @@ app.post('/slack/events', async (req, res) => {
     try {
       await axios.post('https://slack.com/api/chat.postMessage', {
           channel,
-          text: "👋 Hi, we have received your message. Our team will get back to you soon.",
+          text: "Hi there! We're currently in our testing phase and unable to respond to your query directly at the moment. If your issue requires attention, please click the Create Ticket button below, and our team will follow up with you shortly.",
           thread_ts: thread_ts || ts,
           blocks: [
             {
               "type": "section",
               "text": {
                 "type": "mrkdwn",
-                "text": "👋 Hi, we have received your message. Our team will get back to you soon."
+                "text": "Hi there! We're currently in our testing phase and unable to respond to your query directly at the moment. If your issue requires attention, please click the Create Ticket button below, and our team will follow up with you shortly."
               }
             },
             {
@@ -52,7 +52,6 @@ app.post('/slack/events', async (req, res) => {
           }
         });
 
-
       res.sendStatus(200);
     } catch (err) {
       res.sendStatus(500);
@@ -67,14 +66,18 @@ app.use('/slack/interactions', bodyParser.urlencoded({ extended: true }));
 app.post('/slack/interactions', async (req, res) => {
   const payload = JSON.parse(req.body.payload);
 
-  if (payload.type === 'block_actions' && payload.actions[0].action_id === 'create_ticket') {
+  if (
+    payload.type === 'block_actions' &&
+    payload.actions[0].action_id === 'create_ticket'
+  ) {
     const { user, text } = JSON.parse(payload.actions[0].value);
     const ticketChannel = 'C0951LWBXEJ';
-
     try {
       await axios.post('https://slack.com/api/chat.postMessage', {
-        channel: ticketChannel,
-        text: `*New Ticket Created*\n\n*User ID:* <@${user}>\n*Message:* ${text}`
+        channel: payload.channel.id,
+        thread_ts: payload.message.ts,
+        text:
+          `Ticket is being created. Our team is looking into it — we'll reach out to you soon.`,
       }, {
         headers: {
           Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
@@ -82,20 +85,25 @@ app.post('/slack/interactions', async (req, res) => {
         }
       });
 
-      res.send({
-        text: "Ticket created successfully!",
-        replace_original: false
+      await axios.post('https://slack.com/api/chat.postMessage', {
+        channel: ticketChannel,
+        text: `*New Ticket Created*\n\n *User:* <@${user}>\n *Message:* ${text}`
+      }, {
+        headers: {
+          Authorization: `Bearer ${SLACK_BOT_TOKEN}`,
+          'Content-Type': 'application/json'
+        }
       });
+
+      res.sendStatus(200);
     } catch (error) {
-      res.send({
-        text: "Failed to create ticket. Please try again.",
-        replace_original: false
-      });
+      res.status(500).send('Failed to process interaction');
     }
   } else {
     res.sendStatus(200);
   }
 });
+
 
 
 const PORT = process.env.PORT || 3000;
